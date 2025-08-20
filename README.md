@@ -4,6 +4,8 @@
 
 Finance Lite, aylık gelir ve giderlerinizi kolayca takip etmenizi sağlayan basit bir web uygulamasıdır. React ve TypeScript ile geliştirilmiş olup, Vite ile hızlı bir geliştirme deneyimi sunar.
 
+> **Önemli Not:** Bu uygulama kişisel kullanım için geliştirilmiştir. Diğer kişiler de isterlerse kullanabilir, ancak herhangi bir geliştirme veya destek süreci desteklenmemektedir.
+
 ## Özellikler
 
 - 💰 Gelir takibi
@@ -51,6 +53,8 @@ yarn dev
 ## Veri Yapısı
 
 Uygulama, verileri tarayıcının localStorage'ında saklar. Ayrıca, `src/data/` klasöründe örnek veri dosyaları bulunabilir. Bu dosyalar aşağıdaki formatta olmalıdır:
+
+**Önemli:** Tarayıcı güvenlik kısıtlamaları nedeniyle, "Kaydet" butonuna bastığınızda veriler sadece tarayıcının localStorage'ına kaydedilir, `src/data` klasörüne otomatik olarak JSON dosyası oluşturulmaz. Eğer verileri JSON dosyası olarak kaydetmek istiyorsanız, "Bu Ayı Dışa Aktar" butonunu kullanarak indirdiğiniz JSON dosyasını manuel olarak `src/data` klasörüne koyabilirsiniz.
 
 ```json
 {
