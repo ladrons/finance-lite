@@ -1,0 +1,312 @@
+:root {
+  --bg: #0f1115;
+  --panel: #161a22;
+  --panel-2: #1b2130;
+  --text: #e6edf7;
+  --muted: #8a94a7;
+  --border: #2a3142;
+  --ok: #3ecf8e;
+  --bad: #ff7b7b;
+}
+
+* {
+  box-sizing: border-box
+}
+
+body {
+  margin: 0;
+  font: 14px/1.5 system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text)
+}
+
+.container {
+  /* Daha geniş çalışma alanı: tüm kartları genişlet */
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 16px
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap
+}
+
+.input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text)
+}
+
+.btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer
+}
+
+.btn:hover {
+  border-color: #3b4865
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px
+}
+
+@media (max-width:900px) {
+  .grid-2 {
+    grid-template-columns: 1fr
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px
+}
+
+.item {
+  display: grid;
+  /* Sabit: Başlık(1fr) | Tutar(120) | Tarih(120) | Düzenle/Kaydet | Kaldır/İptal */
+  grid-template-columns: minmax(0, 1fr) 120px 120px auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  height: 48px; /* sabit satır yüksekliği: 2 satır görünüm için hesap kolaylığı */
+}
+
+.item.editing {
+  height: auto; /* düzenleme halinde satır yüksekliği artsın */
+}
+
+.money {
+  font-variant-numeric: tabular-nums
+}
+
+.right {
+  text-align: right
+}
+
+.note {
+  color: var(--muted);
+  font-size: 12px
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(62, 207, 142, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(62, 207, 142, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(62, 207, 142, 0);
+  }
+}
+
+.btn-save {
+  background-color: var(--ok);
+  color: #000;
+  font-weight: bold;
+}
+
+/* Kırmızı Sil butonu */
+.btn-danger {
+  background-color: #85190d;
+  border-color: #68130a;
+  color: #fff;
+}
+.btn-danger:hover {
+  background-color: #68130a;
+  border-color: #68130a;
+}
+
+.btn-save.pulse {
+  animation: pulse 1.5s infinite;
+}
+
+/* Ekle butonu (Add) */
+.btn-add {
+  background-color: #547ac2;
+  border-color: #436199;
+  color: #fff;
+  font-weight: 600;
+}
+.btn-add:hover {
+  background-color: #436199;
+  border-color: #436199
+}
+.btn-add:disabled,
+.btn-add[disabled] {
+  background-color: var(--panel-2);
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Date input tweaks */
+input[type="date"] {
+  color-scheme: dark; /* native picker koyu temaya uyum sağlasın */
+}
+/* Chromium/WebKit: native ikon görselini gizle (tıklanabilir kalsın) */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0; /* görünmez, ama tıklama çalışır */
+}
+
+/* TR görünümlü (dd/mm/yyyy) overlay */
+.date-input-wrap {
+  position: relative;
+  width: 120px; /* grid sütunu ile aynı genişlik */
+  overflow: hidden; /* metin/ikon taşmasın */
+  cursor: pointer; /* her yere tıklanabilir */
+}
+.date-input-wrap .date-input {
+  /* Native metni gizle, picker çalışmaya devam etsin */
+  position: relative;
+  z-index: 1;
+  color: transparent;
+  caret-color: transparent;
+  padding-right: 30px; /* ikon boşluğu (daha dar) */
+  width: 100%;
+}
+/* WebKit alanlarını şeffaf yap */
+.date-input-wrap .date-input::-webkit-datetime-edit-fields-wrapper,
+.date-input-wrap .date-input::-webkit-datetime-edit,
+.date-input-wrap .date-input::-webkit-datetime-edit-text,
+.date-input-wrap .date-input::-webkit-datetime-edit-day-field,
+.date-input-wrap .date-input::-webkit-datetime-edit-month-field,
+.date-input-wrap .date-input::-webkit-datetime-edit-year-field {
+  color: transparent;
+  background: transparent;
+}
+.date-input-wrap .date-display {
+  pointer-events: none; /* tıklama input'a geçsin */
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  max-width: calc(100% - 24px); /* ikon alanını bırak */
+  overflow: hidden;
+  font-size: 13px; /* 10 karakter rahat sığsın */
+}
+
+/* Özel beyaz takvim ikonu (native ikonun üstüne) */
+.date-input-wrap::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  right: 8px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  opacity: 0.95;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+}
+
+/* Remove up/down arrows (spinners) from number inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+  appearance: textfield; /* Standard */
+}
+
+/* --- Scrollbar styling for expanded lists --- */
+.scroll-area {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #3b4865 transparent; /* thumb track */
+  scroll-snap-type: y mandatory; /* her zaman öğe başlangıcına sabitle */
+  overscroll-behavior: contain; /* dış kaydırmayı engelle */
+}
+.scroll-area::-webkit-scrollbar {
+  width: 10px;
+}
+.scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-area::-webkit-scrollbar-thumb {
+  background-color: #2a3142; /* var(--border) */
+  border-radius: 8px;
+  border: 2px solid transparent; /* creates inset look */
+  background-clip: content-box;
+}
+.scroll-area:hover::-webkit-scrollbar-thumb {
+  background-color: #3b4865;
+}
+
+/* İki iki kaydırma: sadece tek (1.,3.,5.) öğeler snap noktası olsun */
+.scroll-area .item {
+  scroll-snap-align: start;
+}
+.scroll-area .item:nth-child(even) {
+  scroll-snap-align: none;
+}
+
+/* Uzun başlıkları tek satıra indir ve taşanı gizle */
+.item > div:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Başlık + tarih pili birlikte görünüm */
+.item .item-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: visible; /* pill gizlenmesin */
+}
+.item > div.item-title:first-child {
+  /* İlk sütun için daha spesifik override: pill kesilmesin */
+  overflow: visible !important;
+}
+.item .item-title .title-text {
+  overflow: hidden;
+  text-overflow: ellipsis; /* sadece başlık kısalsın */
+}
+.pill {
+  padding: 2px 6px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+}
+.pill-date {
+  letter-spacing: 0.2px;
+}
