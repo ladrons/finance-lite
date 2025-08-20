@@ -1,6 +1,6 @@
 # Finance Lite - Aylık Finans Takip Uygulaması
 
-![Finance Lite Screenshot](https://via.placeholder.com/800x400?text=Finance+Lite+Screenshot)
+![Finance Lite Screenshot](./src/assets/finance-lite.png)
 
 Finance Lite, aylık gelir ve giderlerinizi kolayca takip etmenizi sağlayan basit bir web uygulamasıdır. React ve TypeScript ile geliştirilmiş olup, Vite ile hızlı bir geliştirme deneyimi sunar.
 
