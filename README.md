@@ -1,69 +1,92 @@
-# React + TypeScript + Vite
+# Finance Lite - Aylık Finans Takip Uygulaması
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Finance Lite Screenshot](https://via.placeholder.com/800x400?text=Finance+Lite+Screenshot)
 
-Currently, two official plugins are available:
+Finance Lite, aylık gelir ve giderlerinizi kolayca takip etmenizi sağlayan basit bir web uygulamasıdır. React ve TypeScript ile geliştirilmiş olup, Vite ile hızlı bir geliştirme deneyimi sunar.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Özellikler
 
-## Expanding the ESLint configuration
+- 💰 Gelir takibi
+- 💸 Sabit gider takibi
+- 💳 Kredi kartı harcamaları takibi
+- 📦 Değişken gider takibi
+- 📊 Aylık özet ve net bakiye hesaplama
+- 📅 Ay bazlı veri yönetimi
+- 📤 Verileri JSON formatında dışa aktarma
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Kurulum
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Gereksinimler
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+- Node.js (v16 veya üzeri)
+- npm veya yarn
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Adımlar
+
+1. Repoyu klonlayın:
+
+```bash
+git clone https://github.com/kullaniciadi/finance-lite.git
+cd finance-lite
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Bağımlılıkları yükleyin:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+# veya
+yarn install
 ```
+
+3. Geliştirme sunucusunu başlatın:
+
+```bash
+npm run dev
+# veya
+yarn dev
+```
+
+4. Tarayıcınızda [http://localhost:5173](http://localhost:5173) adresini açın.
+
+## Veri Yapısı
+
+Uygulama, verileri tarayıcının localStorage'ında saklar. Ayrıca, `src/data/` klasöründe örnek veri dosyaları bulunabilir. Bu dosyalar aşağıdaki formatta olmalıdır:
+
+```json
+{
+  "month": "YYYY-MM",
+  "entries": [
+    {
+      "id": "unique-id",
+      "type": "income|fixed|card|variable",
+      "title": "Açıklama",
+      "amount": 1000,
+      "date": "YYYY-MM-DD",
+      "createdAt": 1754000000000
+    }
+  ]
+}
+```
+
+## Dağıtım
+
+Uygulamayı derlemek için:
+
+```bash
+npm run build
+# veya
+yarn build
+```
+
+Derlenen dosyalar `dist/` klasöründe oluşturulacaktır. Bu dosyaları herhangi bir statik web sunucusunda barındırabilirsiniz.
+
+## Teknolojiler
+
+- [React](https://reactjs.org/) - UI kütüphanesi
+- [TypeScript](https://www.typescriptlang.org/) - Tip güvenliği
+- [Vite](https://vitejs.dev/) - Geliştirme ortamı ve derleme aracı
+- [localStorage API](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) - Veri saklama
+
+## Lisans
+
+MIT
