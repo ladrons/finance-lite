@@ -9,15 +9,4 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// PWA Service Worker kaydı
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .then((registration) => {
-        console.log('SW registered: ', registration)
-      })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError)
-      })
-  })
-}
+// PWA Service Worker otomatik kayıt (vite-plugin-pwa tarafından)
