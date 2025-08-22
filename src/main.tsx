@@ -8,3 +8,5 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// PWA Service Worker otomatik kayıt (vite-plugin-pwa tarafından)

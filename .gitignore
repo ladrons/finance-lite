@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# PWA development files
+dev-dist/
+sw.js
+dev-sw.js
+workbox-*.js
+registerSW.js
+
+# PWA build outputs (if not in dist folder)
+public/sw.js
+public/workbox-*.js
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

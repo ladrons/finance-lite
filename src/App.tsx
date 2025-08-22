@@ -1,5 +1,6 @@
 // src/App.tsx
-import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps */
+import { useMemo, useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from "react";
 import "./index.css";
 
 /** ==== Tipler ==== */
@@ -26,30 +27,9 @@ const fmt = new Intl.NumberFormat("tr-TR", {
   maximumFractionDigits: 2,
 });
 
-/** ==== src/data içindeki tüm ay dosyalarını build-time'da yakala ==== */
-/**
- * NOT: Ay dosyalarını `src/data/2025-08.json` gibi koy.
- * Yeni dosya eklediğinde Vite otomatik yakalar (yeniden derleme sırasında).
- */
-const dataModules = import.meta.glob("../src/data/*.json", { eager: true }) as Record<
-  string,
-  MonthFile
->;
-
-/** Yol -> "YYYY-MM" çıkar, listele */
-function listMonthFiles(): { name: string; file: MonthFile }[] {
-  const out: { name: string; file: MonthFile }[] = [];
-  for (const [path, file] of Object.entries(dataModules)) {
-    const m = path.match(/(\d{4}-\d{2})\.json$/)?.[1];
-    if (m) out.push({ name: m, file });
-  }
-  // Eski->Yeni sırala
-  out.sort((a, b) => a.name.localeCompare(b.name));
-  return out;
-}
 
 /** ==== Yardımcı alt-bileşenler (tek dosyada dursun diye) ==== */
-function AddRow({ label, onAdd, baseMonth }: { label: string; onAdd: (t: string, a: number, d: string) => void; baseMonth: string }) {
+const AddRow = memo(function AddRow({ label, onAdd, baseMonth }: { label: string; onAdd: (t: string, a: number, d: string) => void; baseMonth: string }) {
   const [t, setT] = useState("");
   const [a, setA] = useState<string>("");
   const [d, setD] = useState<string>("");
@@ -79,6 +59,8 @@ function AddRow({ label, onAdd, baseMonth }: { label: string; onAdd: (t: string,
         placeholder={`${label} adı`}
         value={t}
         onChange={(e) => setT(e.target.value)}
+        aria-label={`${label} açıklaması`}
+        aria-describedby={`${label}-help`}
       />
       <input
         className="input right"
@@ -88,6 +70,8 @@ function AddRow({ label, onAdd, baseMonth }: { label: string; onAdd: (t: string,
         pattern="[0-9]*[.,]?[0-9]*"
         value={a}
         onChange={(e) => setA(e.target.value)}
+        aria-label="Tutar (TL)"
+        aria-describedby="amount-help"
       />
       <div
         className="date-input-wrap"
@@ -114,6 +98,8 @@ function AddRow({ label, onAdd, baseMonth }: { label: string; onAdd: (t: string,
             (el as any)?.showPicker?.();
           }}
           ref={dateRef}
+          aria-label="Tarih seçin"
+          aria-describedby="date-help"
         />
         <span className="date-display">{displayD}</span>
       </div>
@@ -130,14 +116,16 @@ function AddRow({ label, onAdd, baseMonth }: { label: string; onAdd: (t: string,
           setA("");
           // tarihi aynı ayda bırak
         }}
+        aria-label={`${label} ekle`}
+        aria-describedby={!canAdd ? "add-help" : undefined}
       >
         Ekle
       </button>
     </div>
   );
-}
+});
 
-function List({
+const List = memo(function List({
   items,
   onRemove,
   onEdit,
@@ -152,35 +140,39 @@ function List({
 }) {
   const overflow = maxVisible !== undefined && items.length > maxVisible;
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [twoRowHeight, setTwoRowHeight] = useState<number | undefined>(undefined);
+  const [maxVisibleHeight, setMaxVisibleHeight] = useState<number | undefined>(undefined);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>("");
   const [editAmount, setEditAmount] = useState<string>("");
   const [editDate, setEditDate] = useState<string>("");
   const editDateRef = useRef<HTMLInputElement | null>(null);
 
-  // İki satır yüksekliğini dinamik ölç: 2+ öğe varsa ilk iki .item'ın toplam yüksekliği
+  // maxVisible kadar öğenin yüksekliğini dinamik ölç
   useLayoutEffect(() => {
     if (!overflow || !listRef.current) {
-      setTwoRowHeight(undefined);
+      setMaxVisibleHeight(undefined);
       return;
     }
     const itemsEls = listRef.current.querySelectorAll<HTMLElement>(".item");
-    if (itemsEls.length >= 2) {
+    const visibleCount = Math.min(maxVisible || 2, itemsEls.length);
+    
+    if (itemsEls.length >= visibleCount && visibleCount > 0) {
       const first = itemsEls[0];
-      const second = itemsEls[1];
-      const desired = second.offsetTop + second.offsetHeight - first.offsetTop;
-      setTwoRowHeight(desired);
+      const last = itemsEls[visibleCount - 1];
+      const desired = last.offsetTop + last.offsetHeight - first.offsetTop;
+      setMaxVisibleHeight(desired);
     } else {
-      setTwoRowHeight(listRef.current.scrollHeight);
+      setMaxVisibleHeight(listRef.current.scrollHeight);
     }
-  }, [items.length, overflow, editingId]);
+  }, [items.length, overflow, editingId, maxVisible]);
 
   return (
     <div
       ref={listRef}
       className={`list ${overflow ? "scroll-area" : ""}`}
-      style={overflow ? { maxHeight: twoRowHeight ?? scrollHeight, overflowY: "auto", paddingRight: 4 } : undefined}
+      style={overflow ? { maxHeight: maxVisibleHeight ?? scrollHeight, overflowY: "auto", paddingRight: 4 } : undefined}
+      role="list"
+      aria-label="Kayıt listesi"
     >
       {items.map((e) => {
         const isEditing = editingId === e.id;
@@ -197,12 +189,13 @@ function List({
             return `${dd.padStart(2, "0")}/${mm.padStart(2, "0")}/${yy}`;
           })();
           return (
-            <div key={e.id} className="item editing">
+            <div key={e.id} className="item editing" role="listitem" aria-label={`${e.title} düzenleniyor`}>
               <input
                 className="input"
                 placeholder="Başlık"
                 value={editTitle}
                 onChange={(ev) => setEditTitle(ev.target.value)}
+                aria-label="Kayıt başlığı"
               />
               <input
                 className="input right"
@@ -212,6 +205,7 @@ function List({
                 pattern="[0-9]*[.,]?[0-9]*"
                 value={editAmount}
                 onChange={(ev) => setEditAmount(ev.target.value)}
+                aria-label="Kayıt tutarı (TL)"
               />
               <div
                 className="date-input-wrap"
@@ -236,6 +230,7 @@ function List({
                     (el as any)?.showPicker?.();
                   }}
                   ref={editDateRef}
+                  aria-label="Kayıt tarihini düzenle"
                 />
                 <span className="date-display">{displayEditD}</span>
               </div>
@@ -250,16 +245,27 @@ function List({
                   onEdit(e.id, editTitle, rounded, editDate);
                   setEditingId(null);
                 }}
+                aria-label={`${e.title} kaydını kaydet`}
               >
                 Kaydet
               </button>
-              <button className="btn" onClick={() => setEditingId(null)}>İptal</button>
+              <button 
+                className="btn" 
+                onClick={() => setEditingId(null)}
+                aria-label="Düzenlemeyi iptal et"
+              >
+                İptal
+              </button>
             </div>
           );
         }
         return (
-          <div key={e.id} className="item">
-            <div title={e.title} className="item-title">
+          <div key={e.id} className="item" role="listitem">
+            <div 
+              title={e.title} 
+              className="item-title"
+              data-amount={fmt.format(e.amount)}
+            >
               <span className="title-text">{e.title}</span>
               {e.date ? (
                 <span className="pill pill-date">
@@ -281,19 +287,40 @@ function List({
                 setEditAmount(String(e.amount).replace(".", ","));
                 setEditDate(e.date ?? `${e.month}-01`);
               }}
+              aria-label={`${e.title} kaydını düzenle`}
             >
               Düzenle
             </button>
-            <button className="btn btn-danger" onClick={() => onRemove(e.id)}>
+            <button 
+              className="btn btn-danger" 
+              onClick={() => onRemove(e.id)}
+              aria-label={`${e.title} kaydını sil`}
+            >
               Kaldır
             </button>
           </div>
         );
       })}
-      {items.length === 0 && <div className="note">Kayıt yok.</div>}
+      {items.length === 0 && (
+        <div 
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px 8px',
+            textAlign: 'center',
+            color: 'var(--muted)',
+            gap: '12px'
+          }}
+        >
+          <div style={{ fontSize: '16px', fontWeight: '500' }}>Henüz kayıt yok</div>
+          
+        </div>
+      )}
     </div>
   );
-}
+});
 
 /** ==== Asıl Uygulama ==== */
 export default function App() {
@@ -302,44 +329,128 @@ export default function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [showFiles, setShowFiles] = useState<boolean>(false);
-  const files = listMonthFiles(); // sağ panel listesi (src/data/..)
+  const [folderFiles, setFolderFiles] = useState<{ name: string; file: MonthFile }[]>([]);
+  
+  /** File System Access API durumu */
+  const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [connectedFolder, setConnectedFolder] = useState<string>('');
+  
+  /** Loading states */
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>('');
+  
+  /** Confirmation dialog state */
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+  
 
-  /** Açılışta: localStorage'dan verileri yükle veya src/data'dan içe aktar */
+  /** Klavye kısayolları ve erişilebilirlik */
   useEffect(() => {
-    // Önce localStorage'dan kayıtlı verileri kontrol et
-    const savedData = localStorage.getItem(`finance-lite-${month}`);
-    
-    if (savedData) {
-      try {
-        const parsedData = JSON.parse(savedData);
-        // localStorage'dan verileri yükle
-        setEntries((prev) => {
-          const merged = [...prev];
-          for (const e of parsedData.entries) merged.push({ ...e, month: parsedData.month } as Entry);
-          const map = new Map<string, Entry>();
-          for (const x of merged) map.set(x.id, x);
-          return Array.from(map.values()).sort((a, b) => a.createdAt - b.createdAt);
-        });
-        console.log(`Veriler localStorage'dan yüklendi: ${month}`);
-      } catch (error) {
-        console.error('localStorage verileri yüklenirken hata:', error);
-      }
-    } else {
-      // localStorage'da veri yoksa dosyadan yükle
-      const f = files.find((x) => x.name === month);
-      if (f) {
-        // tek seferlik merge (aynı id tekrar eklenmesin diye uniq yapıyoruz)
-        setEntries((prev) => {
-          const merged = [...prev];
-          for (const e of f.file.entries) merged.push({ ...e, month: f.file.month } as Entry);
-          const map = new Map<string, Entry>();
-          for (const x of merged) map.set(x.id, x);
-          return Array.from(map.values()).sort((a, b) => a.createdAt - b.createdAt);
-        });
-        console.log(`Veriler dosyadan yüklendi: ${month}`);
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ctrl/Cmd tuşu kontrolü
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key.toLowerCase()) {
+          case 's':
+            e.preventDefault();
+            if (directoryHandle) {
+              saveToFolder();
+            } else {
+              showNotification('⚠️ Önce bir klasör seçin! (Ctrl+S)', 'error', 3000);
+            }
+            break;
+          case 'h':
+            // Ctrl+H - Ana sayfa / Header'a odaklan
+            e.preventDefault();
+            const headerButton = document.querySelector('button[title*="Klasör"]') as HTMLElement;
+            headerButton?.focus();
+            break;
+        }
+      } else if (e.key === 'Escape') {
+        // Escape - Aktif dialog'ları kapat
+        if (confirmDialog.isOpen) {
+          confirmDialog.onCancel?.();
+        }
       }
     }
-  }, [month]);  
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [directoryHandle, month, entries, confirmDialog]);
+
+  /** Ay değiştiğinde seçilen klasörden veri yükle */
+  useEffect(() => {
+    if (!directoryHandle) return;
+    
+    setIsLoading(true);
+    setLoadingMessage('Veriler yükleniyor...');
+    
+    // Mevcut ayın verilerini temizle
+    setEntries(prev => prev.filter(e => e.month !== month));
+    setHasUnsavedChanges(false);
+    
+    // Seçilen klasörden ay dosyasını yükle
+    loadMonthFromDirectory(month).then(monthFile => {
+      if (monthFile) {
+        setEntries(prev => {
+          const merged = [...prev];
+          for (const e of monthFile.entries) {
+            merged.push({ ...e, month: monthFile.month } as Entry);
+          }
+          // Aynı id tekrar eklenmesin diye uniq yap
+          const map = new Map<string, Entry>();
+          for (const x of merged) map.set(x.id, x);
+          return Array.from(map.values()).sort((a, b) => a.createdAt - b.createdAt);
+        });
+        console.log(`Veriler klasörden yüklendi: ${month}`);
+      } else {
+        console.log(`${month} için dosya bulunamadı`);
+      }
+    }).catch(error => {
+      console.error('Dosya yükleme hatası:', error);
+      showNotification(
+        `⚠️ ${month} verisi yüklenemedi: ${error.message || 'Bilinmeyen hata'}`, 
+        'error', 
+        4000
+      );
+    }).finally(() => {
+      setIsLoading(false);
+      setLoadingMessage('');
+    });
+  }, [month, directoryHandle]);
+
+  /** directoryHandle değiştiğinde klasördeki dosyaları yükle */
+  useEffect(() => {
+    if (directoryHandle) {
+      setIsLoading(true);
+      setLoadingMessage('Klasör dosyaları yükleniyor...');
+      
+      loadFilesFromDirectory().then(files => {
+        setFolderFiles(files);
+      }).catch(error => {
+        console.error('Klasör dosya listesi yükleme hatası:', error);
+        showNotification('⚠️ Klasör dosyaları yüklenemedi', 'error', 3000);
+      }).finally(() => {
+        setIsLoading(false);
+        setLoadingMessage('');
+      });
+    } else {
+      setFolderFiles([]);
+    }
+  }, [directoryHandle]);
+
+  
+
 
   /** Filtre & toplamlar */
   const byType = (type: EntryType) => entries.filter((e) => e.month === month && e.type === type);
@@ -359,25 +470,54 @@ export default function App() {
   const totalExpense = totals.fixed + totals.card + totals.variable;
   const net = totals.income - totalExpense;
 
+  /** Confirmation dialog helper */
+  function showConfirmDialog(title: string, message: string, onConfirm: () => void, onCancel?: () => void) {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      onCancel: () => {
+        onCancel?.();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  }
+
   /** CRUD */
-  function add(type: EntryType, title: string, amount: number, date: string) {
+  const add = useCallback((type: EntryType, title: string, amount: number, date: string) => {
     const e: Entry = { id: crypto.randomUUID(), month, type, title, amount, date, createdAt: Date.now() };
     setEntries((prev) => [...prev, e]);
     setHasUnsavedChanges(true);
-  }
-  function remove(id: string) {
-    setEntries((prev) => prev.filter((x) => x.id !== id));
-    setHasUnsavedChanges(true);
-  }
-  function edit(id: string, title: string, amount: number, date?: string) {
+  }, [month]);
+  
+  const remove = useCallback((id: string) => {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    
+    showConfirmDialog(
+      '🗑️ Kayıt Sil',
+      `"${entry.title}" kaydını silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz.`,
+      () => {
+        setEntries((prev) => prev.filter((x) => x.id !== id));
+        setHasUnsavedChanges(true);
+        showNotification('🗑️ Kayıt silindi', 'info', 2000);
+      }
+    );
+  }, [entries]);
+  
+  const edit = useCallback((id: string, title: string, amount: number, date?: string) => {
     setEntries((prev) =>
       prev.map((x) => (x.id === id ? { ...x, title, amount, date: date !== undefined ? date : x.date } : x))
     );
     setHasUnsavedChanges(true);
-  }
+  }, []);
 
   /** İçe aktarma: sağ paneldeki dosyaya basınca belleğe merge */
-  function importMonthFile(mf: MonthFile) {
+  const importMonthFile = useCallback((mf: MonthFile) => {
     setEntries((prev) => {
       const merged = [...prev];
       for (const e of mf.entries) merged.push({ ...e, month: mf.month } as Entry);
@@ -387,186 +527,615 @@ export default function App() {
     });
     // aktif ayı, import edilen aya çekmek istersen:
     setMonth(mf.month);
-  }
+  }, []);
   
   // getCurrentMonthFile function removed since we're using localStorage
 
-  /** Bu ayı tek dosya olarak indir */
-  function exportCurrentMonth() {
-    // Önce kayıt işlemini yap
-    saveChanges();
-    
-    // Sonra dosyayı indir
-    const monthEntries = entries
-      .filter((x) => x.month === month)
-      .map(({ month: _m, ...rest }) => rest);
-    const file: MonthFile = { month, entries: monthEntries };
-    const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${month}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-  
-  /** Değişiklikleri kaydet - localStorage'a kaydeder */
-  function saveChanges() {
-    const monthEntries = entries
-      .filter((x) => x.month === month)
-      .map(({ month: _m, ...rest }) => rest);
-    const file: MonthFile = { month, entries: monthEntries };
+  /** File System Access - Klasörden JSON dosyalarını okuma */
+  async function loadFilesFromDirectory(): Promise<{ name: string; file: MonthFile }[]> {
+    if (!directoryHandle) return [];
     
     try {
-      // localStorage'a kaydet
-      localStorage.setItem(`finance-lite-${month}`, JSON.stringify(file));
-      console.log(`Veriler localStorage'a kaydedildi: ${month}`);
+      const files: { name: string; file: MonthFile }[] = [];
+      
+      // Klasördeki tüm dosyaları tara
+      for await (const [name, handle] of (directoryHandle as any).entries()) {
+        if (handle.kind === 'file' && name.endsWith('.json')) {
+          try {
+            const file = await handle.getFile();
+            const content = await file.text();
+            const monthFile = JSON.parse(content) as MonthFile;
+            
+            // Dosya geçerli MonthFile formatında mı kontrol et
+            if (monthFile && monthFile.month && Array.isArray(monthFile.entries)) {
+              // Dosya adından ay bilgisini çıkar (2025-08.json -> 2025-08)
+              const monthMatch = name.match(/(\d{4}-\d{2})\.json$/);
+              if (monthMatch) {
+                files.push({ name: monthMatch[1], file: monthFile });
+              } else {
+                // Eğer dosya adı formatı uygun değilse, içeriğindeki month'u kullan
+                files.push({ name: monthFile.month, file: monthFile });
+              }
+            }
+          } catch (error) {
+            console.warn(`Dosya okunamadı veya geçersiz format: ${name}`, error);
+          }
+        }
+      }
+      
+      // Tarihe göre sırala (eski->yeni)
+      files.sort((a, b) => a.name.localeCompare(b.name));
+      return files;
+    } catch (error) {
+      console.error('Klasör okuma hatası:', error);
+      return [];
+    }
+  }
+  
+  /** Belirli bir ay dosyasını klasörden oku */
+  async function loadMonthFromDirectory(month: string): Promise<MonthFile | null> {
+    if (!directoryHandle) return null;
+    
+    try {
+      const fileHandle = await directoryHandle.getFileHandle(`${month}.json`);
+      const file = await fileHandle.getFile();
+      const content = await file.text();
+      return JSON.parse(content) as MonthFile;
+    } catch (error) {
+      // Dosya bulunamazsa null dön
+      return null;
+    }
+  }
+  
+  /** Bildirim göster helper fonksiyonu */
+  function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info', duration = 3000) {
+    const colors = {
+      success: '#10b981',
+      error: '#ef4444', 
+      info: '#3b82f6'
+    };
+    
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.cssText = `
+      position: fixed; top: 20px; right: 20px; z-index: 1000;
+      background: ${colors[type]}; color: white; padding: 12px 16px;
+      border-radius: 8px; font-size: 14px; font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      animation: slideInRight 0.3s ease-out;
+      max-width: 320px; word-wrap: break-word;
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.style.animation = 'slideOutRight 0.3s ease-in forwards';
+      setTimeout(() => notification.remove(), 300);
+    }, duration - 300);
+  }
+
+  /** File System Access - Klasör seçme */
+  async function selectFolder() {
+    try {
+      // File System Access API destekleniyorsa
+      if ('showDirectoryPicker' in window) {
+        const handle = await (window as any).showDirectoryPicker({
+          mode: 'readwrite'
+        });
+        
+        // İzin kontrolü
+        const permission = await handle.requestPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+          showNotification('⚠️ Klasör yazma izni gerekli', 'error', 4000);
+          return;
+        }
+        
+        setDirectoryHandle(handle);
+        setConnectedFolder(handle.name);
+        showNotification(`📁 Klasör bağlandı: ${handle.name}`, 'success');
+        
+      } else {
+        showNotification(
+          '❌ File System Access API bu tarayıcıda desteklenmiyor.\nChrome, Edge veya yeni bir tarayıcı kullanın.', 
+          'error', 
+          5000
+        );
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // Kullanıcı iptal etti - sessiz geç
+        console.log('Klasör seçimi iptal edildi');
+      } else {
+        console.error('Klasör seçimi hatası:', error);
+        showNotification(
+          `❌ Klasör seçim hatası: ${error.message || 'Bilinmeyen hata'}`, 
+          'error', 
+          4000
+        );
+      }
+    }
+  }
+  
+  /** File System Access - Dosyayı klasöre kaydet */
+  async function saveToFolder() {
+    if (!directoryHandle) {
+      alert('Önce bir klasör seçin!');
+      return;
+    }
+    
+    setIsSaving(true);
+    setLoadingMessage(`${month}.json kaydediliyor...`);
+    
+    try {
+      const monthEntries = entries
+        .filter((x) => x.month === month)
+        .map(({ month: _m, ...rest }) => rest);
+      const file: MonthFile = { month, entries: monthEntries };
+      const content = JSON.stringify(file, null, 2);
+      
+      const fileHandle = await directoryHandle.getFileHandle(`${month}.json`, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      
       setHasUnsavedChanges(false);
       
-      // Kullanıcıya bildirim göster (sağ üst köşede)
-      const saveNotification = document.createElement('div');
-      saveNotification.textContent = 'Kaydedildi ✓';
-      saveNotification.style.position = 'fixed';
-      saveNotification.style.top = '20px';
-      saveNotification.style.right = '20px';
-      saveNotification.style.backgroundColor = 'var(--ok)';
-      saveNotification.style.color = '#000';
-      saveNotification.style.padding = '10px 15px';
-      saveNotification.style.borderRadius = '4px';
-      saveNotification.style.zIndex = '1000';
-      saveNotification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-      document.body.appendChild(saveNotification);
+      // Klasör dosya listesini güncelle
+      const updatedFiles = await loadFilesFromDirectory();
+      setFolderFiles(updatedFiles);
       
-      // 2 saniye sonra bildirimi kaldır
-      setTimeout(() => {
-        document.body.removeChild(saveNotification);
-      }, 2000);
-    } catch (error) {
-      console.error('Veriler kaydedilirken hata oluştu:', error);
-      alert('Kaydetme sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+      showNotification(`💾 Dosya kaydedildi: ${month}.json`, 'success');
+      
+    } catch (error: any) {
+      console.error('Dosya kaydetme hatası:', error);
+      
+      // Detaylı hata mesajları
+      let errorMessage = '❌ Dosya kaydedilemedi';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = '🚫 Klasör yazma izni reddedildi';
+      } else if (error.name === 'AbortError') {
+        errorMessage = '⏸️ Kaydetme işlemi iptal edildi'; 
+      } else if (error.name === 'QuotaExceededError') {
+        errorMessage = '💾 Disk alanı yetersiz';
+      } else if (error.message) {
+        errorMessage = `❌ Hata: ${error.message}`;
+      }
+      
+      showNotification(errorMessage, 'error', 4000);
+    } finally {
+      setIsSaving(false);
+      setLoadingMessage('');
     }
   }
 
+
   return (
     <div className="container">
+      {/* Skip Navigation Link */}
+      <a href="#main-content" className="skip-link">
+        Ana içeriğe geç
+      </a>
+      
+      {/* Loading Overlay */}
+      {(isLoading || isSaving) && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 17, 21, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div 
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              color: 'var(--text)',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}
+          >
+            <div 
+              style={{
+                width: '24px',
+                height: '24px',
+                border: '3px solid var(--border)',
+                borderTop: '3px solid var(--ok)',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}
+            />
+            {loadingMessage || 'İşlem yapılıyor...'}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 17, 21, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              confirmDialog.onCancel?.();
+            }
+          }}
+        >
+          <div 
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '420px',
+              width: '90%',
+              color: 'var(--text)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600' }}>
+              {confirmDialog.title}
+            </h3>
+            <p style={{ 
+              margin: '0 0 24px 0', 
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line',
+              color: 'var(--muted)'
+            }}>
+              {confirmDialog.message}
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn"
+                onClick={confirmDialog.onCancel}
+                style={{
+                  background: 'var(--panel-2)',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                İptal
+              </button>
+              <button 
+                className="btn btn-danger"
+                onClick={confirmDialog.onConfirm}
+                style={{
+                  background: '#dc2626',
+                  color: 'white',
+                  border: '1px solid #b91c1c'
+                }}
+              >
+                Onayla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <header className="card">
         <div className="row">
-          <h2 style={{ margin: 0 }}>📆 Aylık Finans</h2>
-          <input className="input" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setHasUnsavedChanges(true); }} />
-          <button className="btn" onClick={exportCurrentMonth}>Bu Ayı Dışa Aktar</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ 
+              width: '32px', 
+              height: '32px', 
+              background: 'linear-gradient(135deg, var(--ok) 0%, #34d399 100%)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              boxShadow: '0 2px 8px rgba(62, 207, 142, 0.3)'
+            }}>
+              💰
+            </div>
+            <h2 style={{ margin: 0, fontWeight: '700' }}>Aylık Finans</h2>
+          </div>
+          <span 
+            style={{ 
+              fontSize: '12px', 
+              color: 'var(--muted)', 
+              cursor: 'help',
+              padding: '6px 10px',
+              background: 'var(--panel-2)',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+              marginLeft: '8px',
+              transition: 'all 0.2s ease-in-out'
+            }}
+            title="Klavye Kısayolları:&#10;Ctrl+S: Kaydet&#10;Ctrl+H: Header'a odaklan&#10;Escape: Dialog kapat"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--panel)';
+              e.currentTarget.style.borderColor = 'var(--ok)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--panel-2)';
+              e.currentTarget.style.borderColor = 'var(--border)';
+            }}
+          >
+            ⌨️ Kısayollar
+          </span>
+          <input 
+            className="input" 
+            type="month" 
+            value={month} 
+            onChange={(e) => { 
+              const newMonth = e.target.value;
+              if (hasUnsavedChanges) {
+                showConfirmDialog(
+                  '⚠️ Kaydedilmemiş Değişiklikler',
+                  `Mevcut aydaki değişiklikleriniz kaydedilmemiş.\n\n${newMonth} ayına geçmek istediğinizden emin misiniz?`,
+                  () => {
+                    setMonth(newMonth);
+                    setHasUnsavedChanges(false);
+                  }
+                );
+              } else {
+                setMonth(newMonth);
+              }
+            }} 
+            aria-label="Ay seçin"
+          />
+          
+          {/* File System Access Butonları */}
+          <button 
+            className={`btn ${!connectedFolder ? 'btn-folder pulse' : ''}`}
+            onClick={selectFolder}
+            style={{ background: connectedFolder ? '#10b981' : '#B18A26', color: '#000', fontWeight: 'bold' }}
+            title={connectedFolder ? `Bağlı: ${connectedFolder}` : 'Klasör seç'}
+            aria-label={connectedFolder ? `Bağlı klasör: ${connectedFolder}` : 'Klasör bağla'}
+          >
+            {connectedFolder ? `📁 ${connectedFolder}` : '📁 Klasör Bağla'}
+          </button>
+          
+          
           <button className="btn" onClick={() => setShowFiles((v) => !v)} style={{ marginLeft: 'auto' }}>
             {showFiles ? "Ay dosyalarını gizle" : "Ay dosyalarını göster"}
           </button>
           <button 
-            className={`btn btn-save ${hasUnsavedChanges ? 'pulse' : ''}`} 
-            onClick={saveChanges}
-            style={{ marginLeft: 8 }}
+            className={`btn btn-save ${hasUnsavedChanges && !isSaving && directoryHandle ? 'pulse' : ''} ${!directoryHandle ? 'btn-save-inactive' : ''}`} 
+            onClick={() => {
+              if (directoryHandle) {
+                saveToFolder();
+              } else {
+                showNotification('⚠️ Önce bir klasör seçin!', 'error', 3000);
+              }
+            }}
+            disabled={isSaving || isLoading}
+            style={{ 
+              marginLeft: 8,
+              background: directoryHandle ? (isSaving ? '#6b7280' : '#10b981') : '#6b7280',
+              opacity: directoryHandle && !isSaving && !isLoading ? 1 : 0.6,
+              cursor: isSaving || isLoading ? 'not-allowed' : 'pointer'
+            }}
+            title={
+              isSaving ? 'Kaydediliyor...' : 
+              isLoading ? 'Yükleniyor...' :
+              directoryHandle ? 'Klasöre kaydet' : 'Önce bir klasör seçin'
+            }
           >
-            Kaydet
+            {isSaving ? '⏳ ' : directoryHandle ? '' : '⚠️ '} 
+            {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
           </button>
-          {/* <span className="note">Tek dosya/ay • src/data/*.json otomatik listelenir</span> */}
         </div>
       </header>
 
-      {/* 2 ana sütun grid; alt satırda Özet 2 sütunu span'ler */}
-      <main style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* 2 ana sütun grid - eşit yükseklikli kartlar */}
+      <main 
+        id="main-content"
+        style={{ 
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          minHeight: "calc(100vh - 120px)" // Header'dan sonra kalan alanı kullan
+        }}
+      >
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
             gap: 16,
-            alignItems: "start",
+            alignItems: "stretch", // Kartların eşit yükseklik almasını sağla
+            flex: 1
           }}
         >
-          {/* SOL KOLON: Gelir ve Özet ayrı kartlar */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* GELİR */}
-            <section className="card" style={{ marginBottom: 0, minHeight: 500 }}>
-              <h3 style={{ marginTop: 0 }}>💰 Gelir</h3>
-              <AddRow baseMonth={month} label="Gelir" onAdd={(t, a, d) => add("income", t, a, d)} />
-              <List items={incomes} onRemove={remove} onEdit={edit} />
-              <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
-                Toplam: <span className="money">{fmt.format(totals.income)}</span>
-              </div>
-            </section>
+        {/* SOL KOLON: Gelir ve Özet ayrı kartlar */}
+        <div 
+          style={{ 
+            display: "flex", 
+            flexDirection: "column", 
+            gap: 16,
+            minHeight: "100%" // Parent'in tüm yüksekliğini kullan
+          }}
+        >
+          {/* GELİR - Flex grow ile mevcut alanı kapla */}
+          <section 
+            className="card" 
+            style={{ 
+              marginBottom: 0, 
+              flex: "1 1 auto", // Mevcut alanı kapla
+              display: "flex",
+              flexDirection: "column"
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>💰 Gelir</h3>
+            <AddRow baseMonth={month} label="Gelir" onAdd={(t, a, d) => add("income", t, a, d)} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              <List items={incomes} onRemove={remove} onEdit={edit} maxVisible={7} />
+            </div>
+            <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
+              Toplam: <span className="money">{fmt.format(totals.income)}</span>
+            </div>
+          </section>
 
-            {/* ÖZET */}
-            <section className="card" style={{ marginBottom: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <h3 style={{ margin: 0 }}>📊 Özet</h3>
-                <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: net >= 0 ? "var(--ok)" : "var(--bad)" }}>
-                  Net: {fmt.format(net)}
+          {/* ÖZET - Minimum yükseklik */}
+          <section 
+            className="card" 
+            style={{ 
+              marginBottom: 0,
+              flex: "0 0 auto" // Minimum gerekli yüksekliği al
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>📊 Özet</h3>
+              <div style={{ 
+                fontSize: "1.3rem", 
+                fontWeight: "bold", 
+                color: net >= 0 ? "var(--ok)" : "var(--bad)",
+                padding: "8px 16px",
+                background: net >= 0 ? "rgba(62, 207, 142, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                border: `2px solid ${net >= 0 ? "var(--ok)" : "var(--bad)"}`,
+                borderRadius: "8px",
+                textAlign: "center",
+                minWidth: "140px",
+                boxShadow: `0 2px 8px ${net >= 0 ? "rgba(62, 207, 142, 0.2)" : "rgba(239, 68, 68, 0.2)"}`
+              }}>
+                <div style={{ fontSize: "0.8rem", fontWeight: "normal", opacity: 0.8, marginBottom: "2px" }}>
+                  Net Bakiye
                 </div>
+                {fmt.format(net)}
               </div>
+            </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                <div style={{ backgroundColor: "var(--bg-alt)", padding: 8, borderRadius: 4 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <div>Gelir:</div>
-                    <div style={{ fontWeight: "bold", color: "var(--ok)" }}>{fmt.format(totals.income)}</div>
-                  </div>
-                </div>
-                <div style={{ backgroundColor: "var(--bg-alt)", padding: 8, borderRadius: 4 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <div>Toplam Gider:</div>
-                    <div style={{ fontWeight: "bold", color: totalExpense > 0 ? "var(--bad)" : "var(--text)" }}>{fmt.format(totalExpense)}</div>
-                  </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div style={{ backgroundColor: "var(--panel-2)", padding: 8, borderRadius: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div>Gelir:</div>
+                  <div style={{ fontWeight: "bold", color: "var(--ok)" }}>{fmt.format(totals.income)}</div>
                 </div>
               </div>
+              <div style={{ backgroundColor: "var(--panel-2)", padding: 8, borderRadius: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div>Toplam Gider:</div>
+                  <div style={{ fontWeight: "bold", color: totalExpense > 0 ? "var(--bad)" : "var(--text)" }}>{fmt.format(totalExpense)}</div>
+                </div>
+              </div>
+            </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                <div style={{ backgroundColor: "var(--bg-alt)", padding: 6, borderRadius: 4, fontSize: "0.9rem" }}>
-                  <div>Sabit Giderler</div>
-                  <div style={{ fontWeight: "bold" }}>{fmt.format(totals.fixed)}</div>
-                </div>
-                <div style={{ backgroundColor: "var(--bg-alt)", padding: 6, borderRadius: 4, fontSize: "0.9rem" }}>
-                  <div>Kredi Kartı</div>
-                  <div style={{ fontWeight: "bold" }}>{fmt.format(totals.card)}</div>
-                </div>
-                <div style={{ backgroundColor: "var(--bg-alt)", padding: 6, borderRadius: 4, fontSize: "0.9rem" }}>
-                  <div>Değişken Giderler</div>
-                  <div style={{ fontWeight: "bold" }}>{fmt.format(totals.variable)}</div>
-                </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              <div style={{ backgroundColor: "var(--panel-2)", padding: 6, borderRadius: 4, fontSize: "0.9rem" }}>
+                <div>Sabit Giderler</div>
+                <div style={{ fontWeight: "bold" }}>{fmt.format(totals.fixed)}</div>
               </div>
-              <div className="note" style={{ marginTop: 8, fontSize: "0.8rem" }}>Net = Gelir − (Sabit + Kart + Değişken)</div>
-            </section>
+              <div style={{ backgroundColor: "var(--panel-2)", padding: 6, borderRadius: 4, fontSize: "0.9rem" }}>
+                <div>Kredi Kartı</div>
+                <div style={{ fontWeight: "bold" }}>{fmt.format(totals.card)}</div>
+              </div>
+              <div style={{ backgroundColor: "var(--panel-2)", padding: 6, borderRadius: 4, fontSize: "0.9rem" }}>
+                <div>Değişken Giderler</div>
+                <div style={{ fontWeight: "bold" }}>{fmt.format(totals.variable)}</div>
+              </div>
+            </div>
+            <div className="note" style={{ marginTop: 8, fontSize: "0.8rem" }}>Net = Gelir − (Sabit + Kart + Değişken)</div>
+          </section>
+        </div>
+
+        {/* SAĞ KOLON: Tüm giderler tek kartta - sol kolon ile aynı yükseklik */}
+        <section 
+          className="card" 
+          style={{ 
+            marginBottom: 0,
+            display: "flex",
+            flexDirection: "column",
+            minHeight: "100%" // Sol kolon ile eşit yükseklik
+          }}
+        >
+          <h3>💸 Sabit Giderler</h3>
+          <AddRow baseMonth={month} label="Sabit gider" onAdd={(t, a, d) => add("fixed", t, a, d)} />
+          <List items={fixeds} onRemove={remove} onEdit={edit} maxVisible={2} />
+          <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
+            Toplam: <span className="money">{fmt.format(totals.fixed)}</span>
           </div>
 
-          {/* SAĞ KOLON: Tüm giderler tek kartta */}
-          <section className="card" style={{ marginBottom: 0, alignSelf: "start" }}>
-            <h3>💸 Sabit Giderler</h3>
-            <AddRow baseMonth={month} label="Sabit gider" onAdd={(t, a, d) => add("fixed", t, a, d)} />
-            <List items={fixeds} onRemove={remove} onEdit={edit} maxVisible={2} />
-            <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
-              Toplam: <span className="money">{fmt.format(totals.fixed)}</span>
-            </div>
+          <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "16px 0" }} />
 
-            <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "16px 0" }} />
+          <h3>💳 Kredi Kartı</h3>
+          <AddRow baseMonth={month} label="Kart kalemi" onAdd={(t, a, d) => add("card", t, a, d)} />
+          <List items={cards} onRemove={remove} onEdit={edit} maxVisible={2} />
+          <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
+            Toplam: <span className="money">{fmt.format(totals.card)}</span>
+          </div>
 
-            <h3>💳 Kredi Kartı</h3>
-            <AddRow baseMonth={month} label="Kart kalemi" onAdd={(t, a, d) => add("card", t, a, d)} />
-            <List items={cards} onRemove={remove} onEdit={edit} maxVisible={2} />
-            <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
-              Toplam: <span className="money">{fmt.format(totals.card)}</span>
-            </div>
+          <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "16px 0" }} />
 
-            <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "16px 0" }} />
-
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
             <h3>📦 Değişken Giderler</h3>
             <AddRow baseMonth={month} label="Değişken" onAdd={(t, a, d) => add("variable", t, a, d)} />
-            <List items={variables} onRemove={remove} onEdit={edit} maxVisible={2} />
+            <div style={{ flex: 1 }}>
+              <List items={variables} onRemove={remove} onEdit={edit} maxVisible={2} />
+            </div>
             <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
               Toplam: <span className="money">{fmt.format(totals.variable)}</span>
             </div>
-          </section>
+          </div>
+        </section>
         </div>
 
         {/* Alt kısım: Dosya kartı (ilk açılışta gizli) */}
         {showFiles && (
           <aside className="card" style={{ marginTop: 8 }}>
-            <h3 style={{ marginTop: 0 }}>📁 src/data ay dosyaları</h3>
-            {files.length === 0 && <div className="note">src/data klasörüne 2025-08.json gibi dosya ekle.</div>}
+            <h3 style={{ marginTop: 0 }}>📁 Klasör Dosyaları</h3>
+            {!directoryHandle && (
+              <div 
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  color: 'var(--muted)',
+                  gap: '12px'
+                }}
+              >
+                <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
+                  Dosyaları görmek için<br />yukarıdan "📁 Klasör Bağla" butonuna tıklayın
+                </div>
+              </div>
+            )}
+            {directoryHandle && folderFiles.length === 0 && (
+              <div 
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  color: 'var(--muted)',
+                  gap: '12px'
+                }}
+              >
+                <div style={{ fontSize: '36px', opacity: 0.4 }}>📄</div>
+                <div style={{ fontSize: '16px', fontWeight: '500' }}>JSON dosyası bulunamadı</div>
+                <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
+                  Seçilen klasörde hiç ay dosyası yok.<br />
+                  İlk kaydınızı ekleyip "💾 Kaydet" ile dosya oluşturun.
+                </div>
+              </div>
+            )}
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {files.map(({ name, file }) => (
+              {folderFiles.map(({ name, file }) => (
                 <li key={name} className="item" style={{ gridTemplateColumns: "1fr auto" }}>
                   <div title={`${name}.json`}>{name}.json</div>
                   <button className="btn" onClick={() => importMonthFile(file)}>İçe aktar</button>
