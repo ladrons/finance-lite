@@ -140,35 +140,37 @@ const List = memo(function List({
 }) {
   const overflow = maxVisible !== undefined && items.length > maxVisible;
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [twoRowHeight, setTwoRowHeight] = useState<number | undefined>(undefined);
+  const [maxVisibleHeight, setMaxVisibleHeight] = useState<number | undefined>(undefined);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>("");
   const [editAmount, setEditAmount] = useState<string>("");
   const [editDate, setEditDate] = useState<string>("");
   const editDateRef = useRef<HTMLInputElement | null>(null);
 
-  // İki satır yüksekliğini dinamik ölç: 2+ öğe varsa ilk iki .item'ın toplam yüksekliği
+  // maxVisible kadar öğenin yüksekliğini dinamik ölç
   useLayoutEffect(() => {
     if (!overflow || !listRef.current) {
-      setTwoRowHeight(undefined);
+      setMaxVisibleHeight(undefined);
       return;
     }
     const itemsEls = listRef.current.querySelectorAll<HTMLElement>(".item");
-    if (itemsEls.length >= 2) {
+    const visibleCount = Math.min(maxVisible || 2, itemsEls.length);
+    
+    if (itemsEls.length >= visibleCount && visibleCount > 0) {
       const first = itemsEls[0];
-      const second = itemsEls[1];
-      const desired = second.offsetTop + second.offsetHeight - first.offsetTop;
-      setTwoRowHeight(desired);
+      const last = itemsEls[visibleCount - 1];
+      const desired = last.offsetTop + last.offsetHeight - first.offsetTop;
+      setMaxVisibleHeight(desired);
     } else {
-      setTwoRowHeight(listRef.current.scrollHeight);
+      setMaxVisibleHeight(listRef.current.scrollHeight);
     }
-  }, [items.length, overflow, editingId]);
+  }, [items.length, overflow, editingId, maxVisible]);
 
   return (
     <div
       ref={listRef}
       className={`list ${overflow ? "scroll-area" : ""}`}
-      style={overflow ? { maxHeight: twoRowHeight ?? scrollHeight, overflowY: "auto", paddingRight: 4 } : undefined}
+      style={overflow ? { maxHeight: maxVisibleHeight ?? scrollHeight, overflowY: "auto", paddingRight: 4 } : undefined}
       role="list"
       aria-label="Kayıt listesi"
     >
@@ -306,17 +308,14 @@ const List = memo(function List({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '32px 16px',
+            padding: '24px 8px',
             textAlign: 'center',
             color: 'var(--muted)',
             gap: '12px'
           }}
         >
-          <div style={{ fontSize: '48px', opacity: 0.3 }}>📝</div>
           <div style={{ fontSize: '16px', fontWeight: '500' }}>Henüz kayıt yok</div>
-          <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
-            Yukarıdaki formu kullanarak<br />ilk kaydınızı ekleyebilirsiniz
-          </div>
+          
         </div>
       )}
     </div>
@@ -900,9 +899,9 @@ export default function App() {
           
           {/* File System Access Butonları */}
           <button 
-            className="btn" 
+            className={`btn ${!connectedFolder ? 'btn-folder pulse' : ''}`}
             onClick={selectFolder}
-            style={{ background: connectedFolder ? '#10b981' : '#6b7280' }}
+            style={{ background: connectedFolder ? '#10b981' : '#B18A26', color: '#000', fontWeight: 'bold' }}
             title={connectedFolder ? `Bağlı: ${connectedFolder}` : 'Klasör seç'}
             aria-label={connectedFolder ? `Bağlı klasör: ${connectedFolder}` : 'Klasör bağla'}
           >
@@ -914,7 +913,7 @@ export default function App() {
             {showFiles ? "Ay dosyalarını gizle" : "Ay dosyalarını göster"}
           </button>
           <button 
-            className={`btn btn-save ${hasUnsavedChanges && !isSaving ? 'pulse' : ''}`} 
+            className={`btn btn-save ${hasUnsavedChanges && !isSaving && directoryHandle ? 'pulse' : ''} ${!directoryHandle ? 'btn-save-inactive' : ''}`} 
             onClick={() => {
               if (directoryHandle) {
                 saveToFolder();
@@ -925,7 +924,7 @@ export default function App() {
             disabled={isSaving || isLoading}
             style={{ 
               marginLeft: 8,
-              background: directoryHandle ? (isSaving ? '#6b7280' : hasUnsavedChanges ? '#ef4444' : '#10b981') : '#6b7280',
+              background: directoryHandle ? (isSaving ? '#6b7280' : '#10b981') : '#6b7280',
               opacity: directoryHandle && !isSaving && !isLoading ? 1 : 0.6,
               cursor: isSaving || isLoading ? 'not-allowed' : 'pointer'
             }}
@@ -935,7 +934,7 @@ export default function App() {
               directoryHandle ? 'Klasöre kaydet' : 'Önce bir klasör seçin'
             }
           >
-            {isSaving ? '⏳' : directoryHandle ? '💾' : '⚠️'} 
+            {isSaving ? '⏳ ' : directoryHandle ? '' : '⚠️ '} 
             {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
           </button>
         </div>
@@ -945,13 +944,21 @@ export default function App() {
       <main 
         id="main-content"
         style={{ 
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          display: "flex",
+          flexDirection: "column",
           gap: 16,
-          alignItems: "stretch", // Kartların eşit yükseklik almasını sağla
           minHeight: "calc(100vh - 120px)" // Header'dan sonra kalan alanı kullan
         }}
       >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+            gap: 16,
+            alignItems: "stretch", // Kartların eşit yükseklik almasını sağla
+            flex: 1
+          }}
+        >
         {/* SOL KOLON: Gelir ve Özet ayrı kartlar */}
         <div 
           style={{ 
@@ -974,7 +981,7 @@ export default function App() {
             <h3 style={{ marginTop: 0 }}>💰 Gelir</h3>
             <AddRow baseMonth={month} label="Gelir" onAdd={(t, a, d) => add("income", t, a, d)} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              <List items={incomes} onRemove={remove} onEdit={edit} />
+              <List items={incomes} onRemove={remove} onEdit={edit} maxVisible={7} />
             </div>
             <div className="right" style={{ marginTop: 8, fontWeight: 700 }}>
               Toplam: <span className="money">{fmt.format(totals.income)}</span>
@@ -1082,7 +1089,7 @@ export default function App() {
             </div>
           </div>
         </section>
-      </main>
+        </div>
 
         {/* Alt kısım: Dosya kartı (ilk açılışta gizli) */}
         {showFiles && (
@@ -1101,8 +1108,6 @@ export default function App() {
                   gap: '12px'
                 }}
               >
-                <div style={{ fontSize: '36px', opacity: 0.4 }}>📁</div>
-                <div style={{ fontSize: '16px', fontWeight: '500' }}>Klasör bağlanmamış</div>
                 <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
                   Dosyaları görmek için<br />yukarıdan "📁 Klasör Bağla" butonuna tıklayın
                 </div>

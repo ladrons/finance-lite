@@ -41,19 +41,19 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="%233b82f6"/></svg>',
-            sizes: '192x192',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
-          },
-          {
-            src: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="%233b82f6"/></svg>',
+            src: 'finance-lite-logo.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: 'Square44x44Logo.altform-lightunplated_targetsize-256.png',
+            src: 'finance-lite-logo.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: 'finance-lite-logo.png',
             sizes: '256x256',
             type: 'image/png'
           }

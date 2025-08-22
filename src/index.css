@@ -234,6 +234,15 @@ body {
   box-shadow: 0 6px 12px rgba(62, 207, 142, 0.3);
 }
 
+/* Kaydet butonu klasör seçilmediğinde hover efektini kapat */
+.btn-save-inactive:hover {
+  background-color: #6b7280 !important;
+  transform: none !important;
+  box-shadow: none !important;
+  opacity: 0.6 !important;
+  border-color: var(--border) !important;
+}
+
 /* Kırmızı Sil butonu */
 .btn-danger {
   background-color: #85190d;
@@ -251,6 +260,23 @@ body {
 
 .btn-save.pulse {
   animation: pulse 1.5s infinite;
+}
+
+/* Klasör bağla butonuna özel pulse efekti */
+.btn-folder.pulse {
+  animation: pulse-folder 2s infinite;
+}
+
+@keyframes pulse-folder {
+  0% {
+    box-shadow: 0 0 0 0 rgba(177, 138, 38, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(177, 138, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(177, 138, 38, 0);
+  }
 }
 
 /* Brand gradient utility */
