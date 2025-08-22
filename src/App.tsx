@@ -304,10 +304,6 @@ export default function App() {
             alert('Önce bir klasör seçin!');
           }
           break;
-        case 'e':
-          e.preventDefault();
-          exportCurrentMonth();
-          break;
       }
     }
     
@@ -344,6 +340,19 @@ export default function App() {
       console.error('Dosya yükleme hatası:', error);
     });
   }, [month, directoryHandle]);
+
+  /** directoryHandle değiştiğinde klasördeki dosyaları yükle */
+  useEffect(() => {
+    if (directoryHandle) {
+      loadFilesFromDirectory().then(files => {
+        setFolderFiles(files);
+      }).catch(error => {
+        console.error('Dosya yükleme hatası:', error);
+      });
+    } else {
+      setFolderFiles([]);
+    }
+  }, [directoryHandle]);
 
   
 
@@ -398,20 +407,6 @@ export default function App() {
   
   // getCurrentMonthFile function removed since we're using localStorage
 
-  /** Bu ayı tek dosya olarak indir */
-  function exportCurrentMonth() {
-    const monthEntries = entries
-      .filter((x) => x.month === month)
-      .map(({ month: _m, ...rest }) => rest);
-    const file: MonthFile = { month, entries: monthEntries };
-    const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${month}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-  
   /** File System Access - Klasörden JSON dosyalarını okuma */
   async function loadFilesFromDirectory(): Promise<{ name: string; file: MonthFile }[]> {
     if (!directoryHandle) return [];
@@ -427,13 +422,19 @@ export default function App() {
             const content = await file.text();
             const monthFile = JSON.parse(content) as MonthFile;
             
-            // Dosya adından ay bilgisini çıkar (2025-08.json -> 2025-08)
-            const monthMatch = name.match(/(\d{4}-\d{2})\.json$/);
-            if (monthMatch) {
-              files.push({ name: monthMatch[1], file: monthFile });
+            // Dosya geçerli MonthFile formatında mı kontrol et
+            if (monthFile && monthFile.month && Array.isArray(monthFile.entries)) {
+              // Dosya adından ay bilgisini çıkar (2025-08.json -> 2025-08)
+              const monthMatch = name.match(/(\d{4}-\d{2})\.json$/);
+              if (monthMatch) {
+                files.push({ name: monthMatch[1], file: monthFile });
+              } else {
+                // Eğer dosya adı formatı uygun değilse, içeriğindeki month'u kullan
+                files.push({ name: monthFile.month, file: monthFile });
+              }
             }
           } catch (error) {
-            console.warn(`Dosya okunamadı: ${name}`, error);
+            console.warn(`Dosya okunamadı veya geçersiz format: ${name}`, error);
           }
         }
       }
@@ -470,11 +471,6 @@ export default function App() {
         const handle = await (window as any).showDirectoryPicker();
         setDirectoryHandle(handle);
         setConnectedFolder(handle.name);
-        
-        // Klasördeki dosyaları yükle
-        loadFilesFromDirectory().then(files => {
-          setFolderFiles(files);
-        });
         
         // Bildirim göster
         const notification = document.createElement('div');
@@ -553,12 +549,11 @@ export default function App() {
               borderRadius: '4px',
               marginLeft: '8px'
             }}
-            title="Klavye Kısayolları:&#10;Ctrl+S: Kaydet&#10;Ctrl+E: Export"
+            title="Klavye Kısayolları:&#10;Ctrl+S: Kaydet"
           >
             ⌨️ Kısayollar
           </span>
           <input className="input" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setHasUnsavedChanges(true); }} />
-          <button className="btn" onClick={exportCurrentMonth}>📎 Dışa Aktar</button>
           
           {/* File System Access Butonları */}
           <button 
