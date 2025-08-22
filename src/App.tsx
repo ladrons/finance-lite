@@ -303,6 +303,10 @@ export default function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [showFiles, setShowFiles] = useState<boolean>(false);
   const files = listMonthFiles(); // sağ panel listesi (src/data/..)
+  
+  /** File System Access API durumu */
+  const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [connectedFolder, setConnectedFolder] = useState<string>('');
 
   /** Açılışta: localStorage'dan verileri yükle veya src/data'dan içe aktar */
   useEffect(() => {
@@ -409,6 +413,70 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   }
   
+  /** File System Access - Klasör seçme */
+  async function selectFolder() {
+    try {
+      // File System Access API destekleniyorsa
+      if ('showDirectoryPicker' in window) {
+        const handle = await (window as any).showDirectoryPicker();
+        setDirectoryHandle(handle);
+        setConnectedFolder(handle.name);
+        
+        // Bildirim göster
+        const notification = document.createElement('div');
+        notification.textContent = `📁 Klasör bağlandı: ${handle.name}`;
+        notification.style.cssText = `
+          position: fixed; top: 20px; right: 20px; z-index: 1000;
+          background: #10b981; color: white; padding: 12px 16px;
+          border-radius: 8px; font-size: 14px; font-weight: 500;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+      } else {
+        alert('File System Access API bu tarayıcıda desteklenmiyor. Chrome/Edge kullanın.');
+      }
+    } catch (error) {
+      console.error('Klasör seçimi iptal edildi:', error);
+    }
+  }
+  
+  /** File System Access - Dosyayı klasöre kaydet */
+  async function saveToFolder() {
+    if (!directoryHandle) {
+      alert('Önce bir klasör seçin!');
+      return;
+    }
+    
+    try {
+      const monthEntries = entries
+        .filter((x) => x.month === month)
+        .map(({ month: _m, ...rest }) => rest);
+      const file: MonthFile = { month, entries: monthEntries };
+      const content = JSON.stringify(file, null, 2);
+      
+      const fileHandle = await directoryHandle.getFileHandle(`${month}.json`, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      
+      // Bildirim göster
+      const notification = document.createElement('div');
+      notification.textContent = `💾 Dosya kaydedildi: ${month}.json`;
+      notification.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 1000;
+        background: #3b82f6; color: white; padding: 12px 16px;
+        border-radius: 8px; font-size: 14px; font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      `;
+      document.body.appendChild(notification);
+      setTimeout(() => notification.remove(), 3000);
+    } catch (error) {
+      console.error('Dosya kaydetme hatası:', error);
+      alert('Dosya kaydedilemedi!');
+    }
+  }
+
   /** Değişiklikleri kaydet - localStorage'a kaydeder */
   function saveChanges() {
     const monthEntries = entries
@@ -453,6 +521,27 @@ export default function App() {
           <h2 style={{ margin: 0 }}>📆 Aylık Finans</h2>
           <input className="input" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setHasUnsavedChanges(true); }} />
           <button className="btn" onClick={exportCurrentMonth}>Bu Ayı Dışa Aktar</button>
+          
+          {/* File System Access Butonları */}
+          <button 
+            className="btn" 
+            onClick={selectFolder}
+            style={{ background: connectedFolder ? '#10b981' : '#6b7280' }}
+            title={connectedFolder ? `Bağlı: ${connectedFolder}` : 'Klasör seç'}
+          >
+            {connectedFolder ? `📁 ${connectedFolder}` : '📁 Klasör Bağla'}
+          </button>
+          
+          {directoryHandle && (
+            <button 
+              className="btn" 
+              onClick={saveToFolder}
+              style={{ background: '#3b82f6' }}
+            >
+              💾 Klasöre Kaydet
+            </button>
+          )}
+          
           <button className="btn" onClick={() => setShowFiles((v) => !v)} style={{ marginLeft: 'auto' }}>
             {showFiles ? "Ay dosyalarını gizle" : "Ay dosyalarını göster"}
           </button>
