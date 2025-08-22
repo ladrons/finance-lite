@@ -1,4 +1,5 @@
 // src/App.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps */
 import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import "./index.css";
 
@@ -26,27 +27,6 @@ const fmt = new Intl.NumberFormat("tr-TR", {
   maximumFractionDigits: 2,
 });
 
-/** ==== src/data içindeki tüm ay dosyalarını build-time'da yakala ==== */
-/**
- * NOT: Ay dosyalarını `src/data/2025-08.json` gibi koy.
- * Yeni dosya eklediğinde Vite otomatik yakalar (yeniden derleme sırasında).
- */
-const dataModules = import.meta.glob("../src/data/*.json", { eager: true }) as Record<
-  string,
-  MonthFile
->;
-
-/** Yol -> "YYYY-MM" çıkar, listele */
-function listMonthFiles(): { name: string; file: MonthFile }[] {
-  const out: { name: string; file: MonthFile }[] = [];
-  for (const [path, file] of Object.entries(dataModules)) {
-    const m = path.match(/(\d{4}-\d{2})\.json$/)?.[1];
-    if (m) out.push({ name: m, file });
-  }
-  // Eski->Yeni sırala
-  out.sort((a, b) => a.name.localeCompare(b.name));
-  return out;
-}
 
 /** ==== Yardımcı alt-bileşenler (tek dosyada dursun diye) ==== */
 function AddRow({ label, onAdd, baseMonth }: { label: string; onAdd: (t: string, a: number, d: string) => void; baseMonth: string }) {
@@ -302,15 +282,12 @@ export default function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [showFiles, setShowFiles] = useState<boolean>(false);
-  const files = listMonthFiles(); // sağ panel listesi (src/data/..)
+  const [folderFiles, setFolderFiles] = useState<{ name: string; file: MonthFile }[]>([]);
   
   /** File System Access API durumu */
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [connectedFolder, setConnectedFolder] = useState<string>('');
   
-  /** Arama/Filtreleme durumu */
-  const [searchMode, setSearchMode] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>('');
 
   /** Klavye kısayolları */
   useEffect(() => {
@@ -321,24 +298,15 @@ export default function App() {
       switch (e.key.toLowerCase()) {
         case 's':
           e.preventDefault();
-          saveChanges();
-          // Klasöre de kaydet varsa
           if (directoryHandle) {
             saveToFolder();
+          } else {
+            alert('Önce bir klasör seçin!');
           }
           break;
         case 'e':
           e.preventDefault();
           exportCurrentMonth();
-          break;
-        case 'f':
-          e.preventDefault();
-          setSearchMode(true);
-          // Biraz bekle, sonra input'a odaklan
-          setTimeout(() => {
-            const searchInput = document.querySelector('.search-input') as HTMLInputElement;
-            searchInput?.focus();
-          }, 100);
           break;
       }
     }
@@ -347,62 +315,47 @@ export default function App() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [directoryHandle, month, entries]);
 
-  /** Açılışta: localStorage'dan verileri yükle veya src/data'dan içe aktar */
+  /** Ay değiştiğinde seçilen klasörden veri yükle */
   useEffect(() => {
-    // Önce localStorage'dan kayıtlı verileri kontrol et
-    const savedData = localStorage.getItem(`finance-lite-${month}`);
+    if (!directoryHandle) return;
     
-    if (savedData) {
-      try {
-        const parsedData = JSON.parse(savedData);
-        // localStorage'dan verileri yükle
-        setEntries((prev) => {
+    // Mevcut ayın verilerini temizle
+    setEntries(prev => prev.filter(e => e.month !== month));
+    setHasUnsavedChanges(false);
+    
+    // Seçilen klasörden ay dosyasını yükle
+    loadMonthFromDirectory(month).then(monthFile => {
+      if (monthFile) {
+        setEntries(prev => {
           const merged = [...prev];
-          for (const e of parsedData.entries) merged.push({ ...e, month: parsedData.month } as Entry);
+          for (const e of monthFile.entries) {
+            merged.push({ ...e, month: monthFile.month } as Entry);
+          }
+          // Aynı id tekrar eklenmesin diye uniq yap
           const map = new Map<string, Entry>();
           for (const x of merged) map.set(x.id, x);
           return Array.from(map.values()).sort((a, b) => a.createdAt - b.createdAt);
         });
-        console.log(`Veriler localStorage'dan yüklendi: ${month}`);
-      } catch (error) {
-        console.error('localStorage verileri yüklenirken hata:', error);
+        console.log(`Veriler klasörden yüklendi: ${month}`);
+      } else {
+        console.log(`${month} için dosya bulunamadı`);
       }
-    } else {
-      // localStorage'da veri yoksa dosyadan yükle
-      const f = files.find((x) => x.name === month);
-      if (f) {
-        // tek seferlik merge (aynı id tekrar eklenmesin diye uniq yapıyoruz)
-        setEntries((prev) => {
-          const merged = [...prev];
-          for (const e of f.file.entries) merged.push({ ...e, month: f.file.month } as Entry);
-          const map = new Map<string, Entry>();
-          for (const x of merged) map.set(x.id, x);
-          return Array.from(map.values()).sort((a, b) => a.createdAt - b.createdAt);
-        });
-        console.log(`Veriler dosyadan yüklendi: ${month}`);
-      }
-    }
-  }, [month]);  
+    }).catch(error => {
+      console.error('Dosya yükleme hatası:', error);
+    });
+  }, [month, directoryHandle]);
 
-  /** Arama ile filtrelenmiş entries */
-  const filteredEntries = useMemo(() => {
-    if (!searchTerm.trim()) return entries;
-    
-    const term = searchTerm.toLowerCase();
-    return entries.filter(entry => 
-      entry.title.toLowerCase().includes(term) ||
-      entry.amount.toString().includes(term)
-    );
-  }, [entries, searchTerm]);
+  
+
 
   /** Filtre & toplamlar */
-  const byType = (type: EntryType) => filteredEntries.filter((e) => e.month === month && e.type === type);
+  const byType = (type: EntryType) => entries.filter((e) => e.month === month && e.type === type);
   const sum = (arr: Entry[]) => arr.reduce((a, b) => a + b.amount, 0);
 
-  const incomes = useMemo(() => byType("income"), [filteredEntries, month]);
-  const fixeds = useMemo(() => byType("fixed"), [filteredEntries, month]);
-  const cards = useMemo(() => byType("card"), [filteredEntries, month]);
-  const variables = useMemo(() => byType("variable"), [filteredEntries, month]);
+  const incomes = useMemo(() => byType("income"), [entries, month]);
+  const fixeds = useMemo(() => byType("fixed"), [entries, month]);
+  const cards = useMemo(() => byType("card"), [entries, month]);
+  const variables = useMemo(() => byType("variable"), [entries, month]);
 
   const totals = {
     income: sum(incomes),
@@ -447,10 +400,6 @@ export default function App() {
 
   /** Bu ayı tek dosya olarak indir */
   function exportCurrentMonth() {
-    // Önce kayıt işlemini yap
-    saveChanges();
-    
-    // Sonra dosyayı indir
     const monthEntries = entries
       .filter((x) => x.month === month)
       .map(({ month: _m, ...rest }) => rest);
@@ -463,6 +412,56 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   }
   
+  /** File System Access - Klasörden JSON dosyalarını okuma */
+  async function loadFilesFromDirectory(): Promise<{ name: string; file: MonthFile }[]> {
+    if (!directoryHandle) return [];
+    
+    try {
+      const files: { name: string; file: MonthFile }[] = [];
+      
+      // Klasördeki tüm dosyaları tara
+      for await (const [name, handle] of (directoryHandle as any).entries()) {
+        if (handle.kind === 'file' && name.endsWith('.json')) {
+          try {
+            const file = await handle.getFile();
+            const content = await file.text();
+            const monthFile = JSON.parse(content) as MonthFile;
+            
+            // Dosya adından ay bilgisini çıkar (2025-08.json -> 2025-08)
+            const monthMatch = name.match(/(\d{4}-\d{2})\.json$/);
+            if (monthMatch) {
+              files.push({ name: monthMatch[1], file: monthFile });
+            }
+          } catch (error) {
+            console.warn(`Dosya okunamadı: ${name}`, error);
+          }
+        }
+      }
+      
+      // Tarihe göre sırala (eski->yeni)
+      files.sort((a, b) => a.name.localeCompare(b.name));
+      return files;
+    } catch (error) {
+      console.error('Klasör okuma hatası:', error);
+      return [];
+    }
+  }
+  
+  /** Belirli bir ay dosyasını klasörden oku */
+  async function loadMonthFromDirectory(month: string): Promise<MonthFile | null> {
+    if (!directoryHandle) return null;
+    
+    try {
+      const fileHandle = await directoryHandle.getFileHandle(`${month}.json`);
+      const file = await fileHandle.getFile();
+      const content = await file.text();
+      return JSON.parse(content) as MonthFile;
+    } catch (error) {
+      // Dosya bulunamazsa null dön
+      return null;
+    }
+  }
+  
   /** File System Access - Klasör seçme */
   async function selectFolder() {
     try {
@@ -471,6 +470,11 @@ export default function App() {
         const handle = await (window as any).showDirectoryPicker();
         setDirectoryHandle(handle);
         setConnectedFolder(handle.name);
+        
+        // Klasördeki dosyaları yükle
+        loadFilesFromDirectory().then(files => {
+          setFolderFiles(files);
+        });
         
         // Bildirim göster
         const notification = document.createElement('div');
@@ -510,6 +514,12 @@ export default function App() {
       await writable.write(content);
       await writable.close();
       
+      setHasUnsavedChanges(false);
+      
+      // Klasör dosya listesini güncelle
+      const updatedFiles = await loadFilesFromDirectory();
+      setFolderFiles(updatedFiles);
+      
       // Bildirim göster
       const notification = document.createElement('div');
       notification.textContent = `💾 Dosya kaydedildi: ${month}.json`;
@@ -527,42 +537,6 @@ export default function App() {
     }
   }
 
-  /** Değişiklikleri kaydet - localStorage'a kaydeder */
-  function saveChanges() {
-    const monthEntries = entries
-      .filter((x) => x.month === month)
-      .map(({ month: _m, ...rest }) => rest);
-    const file: MonthFile = { month, entries: monthEntries };
-    
-    try {
-      // localStorage'a kaydet
-      localStorage.setItem(`finance-lite-${month}`, JSON.stringify(file));
-      console.log(`Veriler localStorage'a kaydedildi: ${month}`);
-      setHasUnsavedChanges(false);
-      
-      // Kullanıcıya bildirim göster (sağ üst köşede)
-      const saveNotification = document.createElement('div');
-      saveNotification.textContent = 'Kaydedildi ✓';
-      saveNotification.style.position = 'fixed';
-      saveNotification.style.top = '20px';
-      saveNotification.style.right = '20px';
-      saveNotification.style.backgroundColor = 'var(--ok)';
-      saveNotification.style.color = '#000';
-      saveNotification.style.padding = '10px 15px';
-      saveNotification.style.borderRadius = '4px';
-      saveNotification.style.zIndex = '1000';
-      saveNotification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-      document.body.appendChild(saveNotification);
-      
-      // 2 saniye sonra bildirimi kaldır
-      setTimeout(() => {
-        document.body.removeChild(saveNotification);
-      }, 2000);
-    } catch (error) {
-      console.error('Veriler kaydedilirken hata oluştu:', error);
-      alert('Kaydetme sırasında bir hata oluştu. Lütfen tekrar deneyin.');
-    }
-  }
 
   return (
     <div className="container">
@@ -579,12 +553,12 @@ export default function App() {
               borderRadius: '4px',
               marginLeft: '8px'
             }}
-            title="Klavye Kısayolları:&#10;Ctrl+S: Kaydet&#10;Ctrl+E: Export&#10;Ctrl+F: Arama"
+            title="Klavye Kısayolları:&#10;Ctrl+S: Kaydet&#10;Ctrl+E: Export"
           >
             ⌨️ Kısayollar
           </span>
           <input className="input" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setHasUnsavedChanges(true); }} />
-          <button className="btn" onClick={exportCurrentMonth}>Bu Ayı Dışa Aktar</button>
+          <button className="btn" onClick={exportCurrentMonth}>📎 Dışa Aktar</button>
           
           {/* File System Access Butonları */}
           <button 
@@ -596,67 +570,29 @@ export default function App() {
             {connectedFolder ? `📁 ${connectedFolder}` : '📁 Klasör Bağla'}
           </button>
           
-          {directoryHandle && (
-            <button 
-              className="btn" 
-              onClick={saveToFolder}
-              style={{ background: '#3b82f6' }}
-            >
-              💾 Klasöre Kaydet
-            </button>
-          )}
-          
-          <button 
-            className="btn" 
-            onClick={() => setSearchMode(!searchMode)}
-            style={{ background: searchMode ? '#3b82f6' : '#6b7280' }}
-          >
-            🔍 {searchMode ? 'Aramayı Kapat' : 'Ara'}
-          </button>
           
           <button className="btn" onClick={() => setShowFiles((v) => !v)} style={{ marginLeft: 'auto' }}>
             {showFiles ? "Ay dosyalarını gizle" : "Ay dosyalarını göster"}
           </button>
           <button 
             className={`btn btn-save ${hasUnsavedChanges ? 'pulse' : ''}`} 
-            onClick={saveChanges}
-            style={{ marginLeft: 8 }}
+            onClick={() => {
+              if (directoryHandle) {
+                saveToFolder();
+              } else {
+                alert('Önce bir klasör seçin!');
+              }
+            }}
+            style={{ 
+              marginLeft: 8,
+              background: directoryHandle ? (hasUnsavedChanges ? '#ef4444' : '#10b981') : '#6b7280',
+              opacity: directoryHandle ? 1 : 0.6
+            }}
+            title={directoryHandle ? 'Klasöre kaydet' : 'Önce bir klasör seçin'}
           >
-            Kaydet
+            {directoryHandle ? '💾' : '⚠️'} Kaydet
           </button>
-          {/* <span className="note">Tek dosya/ay • src/data/*.json otomatik listelenir</span> */}
         </div>
-        
-        {/* Arama Barı */}
-        {searchMode && (
-          <div className="row" style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
-            <input
-              className="input search-input"
-              placeholder="Başlık veya tutar ile ara... (ESC ile kapat)"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setSearchMode(false);
-                  setSearchTerm('');
-                }
-              }}
-              style={{ flex: 1 }}
-              autoFocus
-            />
-            {searchTerm && (
-              <span style={{ fontSize: '14px', color: '#6b7280', padding: '0 12px' }}>
-                {filteredEntries.filter(e => e.month === month).length} sonuç
-              </span>
-            )}
-            <button 
-              className="btn" 
-              onClick={() => { setSearchMode(false); setSearchTerm(''); }}
-            >
-              ✕ Kapat
-            </button>
-          </div>
-        )}
       </header>
 
       {/* 2 ana sütun grid; alt satırda Özet 2 sütunu span'ler */}
@@ -755,10 +691,11 @@ export default function App() {
         {/* Alt kısım: Dosya kartı (ilk açılışta gizli) */}
         {showFiles && (
           <aside className="card" style={{ marginTop: 8 }}>
-            <h3 style={{ marginTop: 0 }}>📁 src/data ay dosyaları</h3>
-            {files.length === 0 && <div className="note">src/data klasörüne 2025-08.json gibi dosya ekle.</div>}
+            <h3 style={{ marginTop: 0 }}>📁 Klasör Dosyaları</h3>
+            {!directoryHandle && <div className="note">Dosyaları görmek için önce bir klasör seçin.</div>}
+            {directoryHandle && folderFiles.length === 0 && <div className="note">Seçilen klasörde JSON dosyası bulunamadı.</div>}
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {files.map(({ name, file }) => (
+              {folderFiles.map(({ name, file }) => (
                 <li key={name} className="item" style={{ gridTemplateColumns: "1fr auto" }}>
                   <div title={`${name}.json`}>{name}.json</div>
                   <button className="btn" onClick={() => importMonthFile(file)}>İçe aktar</button>
