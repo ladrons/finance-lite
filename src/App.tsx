@@ -384,6 +384,17 @@ export default function App() {
     }
   }, [month]);  
 
+  /** Arama ile filtrelenmiş entries */
+  const filteredEntries = useMemo(() => {
+    if (!searchTerm.trim()) return entries;
+    
+    const term = searchTerm.toLowerCase();
+    return entries.filter(entry => 
+      entry.title.toLowerCase().includes(term) ||
+      entry.amount.toString().includes(term)
+    );
+  }, [entries, searchTerm]);
+
   /** Filtre & toplamlar */
   const byType = (type: EntryType) => filteredEntries.filter((e) => e.month === month && e.type === type);
   const sum = (arr: Entry[]) => arr.reduce((a, b) => a + b.amount, 0);
@@ -432,17 +443,6 @@ export default function App() {
     setMonth(mf.month);
   }
   
-  /** Arama ile filtrelenmiş entries */
-  const filteredEntries = useMemo(() => {
-    if (!searchTerm.trim()) return entries;
-    
-    const term = searchTerm.toLowerCase();
-    return entries.filter(entry => 
-      entry.title.toLowerCase().includes(term) ||
-      entry.amount.toString().includes(term)
-    );
-  }, [entries, searchTerm]);
-
   // getCurrentMonthFile function removed since we're using localStorage
 
   /** Bu ayı tek dosya olarak indir */
