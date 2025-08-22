@@ -307,6 +307,45 @@ export default function App() {
   /** File System Access API durumu */
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [connectedFolder, setConnectedFolder] = useState<string>('');
+  
+  /** Arama/Filtreleme durumu */
+  const [searchMode, setSearchMode] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
+  /** Klavye kısayolları */
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ctrl/Cmd tuşu kontrolü
+      if (!(e.ctrlKey || e.metaKey)) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 's':
+          e.preventDefault();
+          saveChanges();
+          // Klasöre de kaydet varsa
+          if (directoryHandle) {
+            saveToFolder();
+          }
+          break;
+        case 'e':
+          e.preventDefault();
+          exportCurrentMonth();
+          break;
+        case 'f':
+          e.preventDefault();
+          setSearchMode(true);
+          // Biraz bekle, sonra input'a odaklan
+          setTimeout(() => {
+            const searchInput = document.querySelector('.search-input') as HTMLInputElement;
+            searchInput?.focus();
+          }, 100);
+          break;
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [directoryHandle, month, entries]);
 
   /** Açılışta: localStorage'dan verileri yükle veya src/data'dan içe aktar */
   useEffect(() => {
@@ -346,13 +385,13 @@ export default function App() {
   }, [month]);  
 
   /** Filtre & toplamlar */
-  const byType = (type: EntryType) => entries.filter((e) => e.month === month && e.type === type);
+  const byType = (type: EntryType) => filteredEntries.filter((e) => e.month === month && e.type === type);
   const sum = (arr: Entry[]) => arr.reduce((a, b) => a + b.amount, 0);
 
-  const incomes = useMemo(() => byType("income"), [entries, month]);
-  const fixeds = useMemo(() => byType("fixed"), [entries, month]);
-  const cards = useMemo(() => byType("card"), [entries, month]);
-  const variables = useMemo(() => byType("variable"), [entries, month]);
+  const incomes = useMemo(() => byType("income"), [filteredEntries, month]);
+  const fixeds = useMemo(() => byType("fixed"), [filteredEntries, month]);
+  const cards = useMemo(() => byType("card"), [filteredEntries, month]);
+  const variables = useMemo(() => byType("variable"), [filteredEntries, month]);
 
   const totals = {
     income: sum(incomes),
@@ -393,6 +432,17 @@ export default function App() {
     setMonth(mf.month);
   }
   
+  /** Arama ile filtrelenmiş entries */
+  const filteredEntries = useMemo(() => {
+    if (!searchTerm.trim()) return entries;
+    
+    const term = searchTerm.toLowerCase();
+    return entries.filter(entry => 
+      entry.title.toLowerCase().includes(term) ||
+      entry.amount.toString().includes(term)
+    );
+  }, [entries, searchTerm]);
+
   // getCurrentMonthFile function removed since we're using localStorage
 
   /** Bu ayı tek dosya olarak indir */
@@ -519,6 +569,20 @@ export default function App() {
       <header className="card">
         <div className="row">
           <h2 style={{ margin: 0 }}>📆 Aylık Finans</h2>
+          <span 
+            style={{ 
+              fontSize: '12px', 
+              color: '#6b7280', 
+              cursor: 'help',
+              padding: '4px 8px',
+              background: '#f3f4f6',
+              borderRadius: '4px',
+              marginLeft: '8px'
+            }}
+            title="Klavye Kısayolları:&#10;Ctrl+S: Kaydet&#10;Ctrl+E: Export&#10;Ctrl+F: Arama"
+          >
+            ⌨️ Kısayollar
+          </span>
           <input className="input" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setHasUnsavedChanges(true); }} />
           <button className="btn" onClick={exportCurrentMonth}>Bu Ayı Dışa Aktar</button>
           
@@ -542,6 +606,14 @@ export default function App() {
             </button>
           )}
           
+          <button 
+            className="btn" 
+            onClick={() => setSearchMode(!searchMode)}
+            style={{ background: searchMode ? '#3b82f6' : '#6b7280' }}
+          >
+            🔍 {searchMode ? 'Aramayı Kapat' : 'Ara'}
+          </button>
+          
           <button className="btn" onClick={() => setShowFiles((v) => !v)} style={{ marginLeft: 'auto' }}>
             {showFiles ? "Ay dosyalarını gizle" : "Ay dosyalarını göster"}
           </button>
@@ -554,6 +626,37 @@ export default function App() {
           </button>
           {/* <span className="note">Tek dosya/ay • src/data/*.json otomatik listelenir</span> */}
         </div>
+        
+        {/* Arama Barı */}
+        {searchMode && (
+          <div className="row" style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
+            <input
+              className="input search-input"
+              placeholder="Başlık veya tutar ile ara... (ESC ile kapat)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setSearchMode(false);
+                  setSearchTerm('');
+                }
+              }}
+              style={{ flex: 1 }}
+              autoFocus
+            />
+            {searchTerm && (
+              <span style={{ fontSize: '14px', color: '#6b7280', padding: '0 12px' }}>
+                {filteredEntries.filter(e => e.month === month).length} sonuç
+              </span>
+            )}
+            <button 
+              className="btn" 
+              onClick={() => { setSearchMode(false); setSearchTerm(''); }}
+            >
+              ✕ Kapat
+            </button>
+          </div>
+        )}
       </header>
 
       {/* 2 ana sütun grid; alt satırda Özet 2 sütunu span'ler */}
