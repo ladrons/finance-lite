@@ -1094,7 +1094,7 @@ export default function FinanceApp() {
         {/* Alt kısım: Dosya kartı (ilk açılışta gizli) */}
         {showFiles && (
           <aside className="card" style={{ marginTop: 8 }}>
-            <h3 style={{ marginTop: 0 }}>📁 Klasör Dosyaları</h3>
+            <h3 style={{ marginTop: 0 }}>📁 Harcama Kayıtları</h3>
             {!directoryHandle && (
               <div 
                 style={{
@@ -1134,14 +1134,25 @@ export default function FinanceApp() {
                 </div>
               </div>
             )}
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {folderFiles.map(({ name, file }) => (
-                <li key={name} className="item" style={{ gridTemplateColumns: "1fr auto" }}>
-                  <div title={`${name}.json`}>{name}.json</div>
-                  <button className="btn" onClick={() => importMonthFile(file)}>İçe aktar</button>
-                </li>
-              ))}
-            </ul>
+            <div 
+              className={`${folderFiles.length > 6 ? 'scroll-area' : ''}`}
+              style={{
+                ...(folderFiles.length > 6 ? {
+                  maxHeight: '300px',
+                  overflowY: 'auto' as const,
+                  paddingRight: 4
+                } : {})
+              }}
+            >
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                {folderFiles.map(({ name, file }) => (
+                  <li key={name} className="item" style={{ gridTemplateColumns: "1fr auto" }}>
+                    <div title={`${name}.json`}>{name}.json</div>
+                    <button className="btn" onClick={() => importMonthFile(file)}>İçe aktar</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </aside>
         )}
       </main>
