@@ -7,6 +7,7 @@ export interface PWADetectionResult {
   installPrompt: BeforeInstallPromptEvent | null;
   canInstall: boolean;
   detectionMethod: 'standalone' | 'utm_source' | 'matchMedia' | 'userAgent' | 'none';
+  isLoading: boolean;
 }
 
 // BeforeInstallPromptEvent tipini tanımlayalım
@@ -27,6 +28,7 @@ export function usePWADetection(): PWADetectionResult {
   const [isInstallable, setIsInstallable] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [detectionMethod, setDetectionMethod] = useState<PWADetectionResult['detectionMethod']>('none');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     function detectPWA(): { isPWA: boolean; method: PWADetectionResult['detectionMethod'] } {
@@ -68,6 +70,7 @@ export function usePWADetection(): PWADetectionResult {
     const detection = detectPWA();
     setIsPWA(detection.isPWA);
     setDetectionMethod(detection.method);
+    setIsLoading(false); // Detection tamamlandı
 
     // PWA yükleme prompt'unu yakala
     function handleBeforeInstallPrompt(e: BeforeInstallPromptEvent) {
@@ -126,6 +129,7 @@ export function usePWADetection(): PWADetectionResult {
     isInstallable,
     installPrompt,
     canInstall,
-    detectionMethod
+    detectionMethod,
+    isLoading
   };
 }

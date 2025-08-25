@@ -22,6 +22,17 @@ export default function PWAGuard({
     console.log('PWA Detection Result:', pwaDetection);
   }
 
+  // Loading durumunda boş ekran göster (flash effect önler)
+  if (pwaDetection.isLoading) {
+    return <div style={{ 
+      background: 'var(--bg)', 
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }} />;
+  }
+
   // PWA olarak çalışıyorsa içeriği göster
   if (pwaDetection.isPWA) {
     return <>{children}</>;
