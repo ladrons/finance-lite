@@ -5,5 +5,13 @@
             "/assets/*",
             "/*.{js,css,png,svg,ico}"
         ]
+    },
+    "mimeTypes": {
+        ".json": "text/json",
+        ".woff": "font/woff",
+        ".woff2": "font/woff2",
+        ".ttf": "font/ttf",
+        ".js": "application/javascript",
+        ".css": "text/css"
     }
 }
