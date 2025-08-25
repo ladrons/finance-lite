@@ -25,11 +25,13 @@ export default function PWAGuard({
   // Loading durumunda boş ekran göster (flash effect önler)
   if (pwaDetection.isLoading) {
     return <div style={{ 
-      background: 'var(--bg)', 
+      background: '#0f1115', // Ana uygulama ile aynı arka plan rengi
       minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
+      width: '100vw',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      zIndex: 9999
     }} />;
   }
 
