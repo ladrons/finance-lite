@@ -20,25 +20,8 @@ export default function LandingPage() {
     }
   };
 
-  // Eğer zaten PWA olarak çalışıyorsa /app'e yönlendir
-  if (isPWA) {
-    window.location.href = '/app';
-    return (
-      <div style={{ 
-        padding: '40px', 
-        textAlign: 'center',
-        background: 'var(--bg)',
-        color: 'var(--text)',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <p>PWA tespit edildi, yönlendiriliyor...</p>
-      </div>
-    );
-  }
+  // PWA tespit edilse bile landing page'yi göster
+  // Otomatik yönlendirme yerine kullanıcıya seçenek sun
 
   return (
     <div style={{ 
@@ -105,8 +88,30 @@ export default function LandingPage() {
             <strong>Progressive Web App</strong> uygulaması
           </p>
 
-          {/* Install Button */}
-          {canInstall ? (
+          {/* Install Button veya Uygulama Girişi */}
+          {isPWA ? (
+            // PWA olarak çalışıyorsa, uygulamaya giriş butonu göster
+            <button 
+              onClick={() => window.location.href = '/app'}
+              style={{
+                background: '#10b981',
+                color: 'white',
+                border: 'none',
+                padding: '16px 32px',
+                borderRadius: '12px',
+                fontSize: '18px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3)',
+                transition: 'transform 0.2s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              🚀 Uygulamayı Başlat
+            </button>
+          ) : canInstall ? (
+            // PWA yüklenebiliyorsa, yükleme butonu göster
             <button 
               onClick={handleInstallPWA}
               style={{
@@ -127,6 +132,7 @@ export default function LandingPage() {
               📱 Uygulamayı Yükle
             </button>
           ) : (
+            // PWA yüklenemiyorsa, bilgi mesajı göster
             <div style={{
               background: 'rgba(255, 255, 255, 0.1)',
               border: '1px solid rgba(255, 255, 255, 0.2)',

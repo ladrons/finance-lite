@@ -54,12 +54,13 @@ export function usePWADetection(): PWADetectionResult {
         return { isPWA: true, method: 'matchMedia' };
       }
 
-      // Yöntem 5: User Agent kontrolü (son çare)
+      // Yöntem 5: User Agent kontrolü (son çare) - Çok spesifik durumlar
       const userAgent = window.navigator.userAgent.toLowerCase();
-      if (userAgent.includes('wv') || // WebView
-          (userAgent.includes('chrome') && !userAgent.includes('browser'))) { // Chrome PWA
+      if (userAgent.includes('wv')) { // Sadece WebView
         return { isPWA: true, method: 'userAgent' };
       }
+      
+      // Chrome kontrolünü kaldırdık - çünkü normal Chrome tarayıcısını PWA olarak tespit ediyordu
 
       return { isPWA: false, method: 'none' };
     }
